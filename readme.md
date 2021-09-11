@@ -1,5 +1,5 @@
 # Listenssh
-ORIGIANL CODE BY [pccs](https://pccs.uk), this is a modified by me
+ORIGIANL CODE BY [pccs](https://pccs.uk), this is a modified one by me. I have pretty small python experience so hope everything is working fine
 
 ## Installation
 
