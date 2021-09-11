@@ -2,10 +2,13 @@ import requests
 import os
 import socket
 import configparser
+import random
+import string
 
 url = 'https://api.abuseipdb.com/api/v2/report'
 
 config = configparser.ConfigParser()
+config.read('config.ini')
 
 socketname = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
@@ -20,7 +23,7 @@ while True:
   params = {
       'ip': str(address),
       'categories': '18,20',
-      'comment': "Unauthorized connection attempt detected from IP address " + str(address) + " to port 22"
+      'comment': "Unauthorized connection attempt detected from IP address " + str(address) + " to port 22 " + "[" + random.choice(string.ascii_letters) + "]"
   }
 
   headers = {
