@@ -3,6 +3,11 @@ ORIGIANL CODE BY [pccs](pccs.uk), this is a modified by me
 
 ## Installation
 
+### Get all files from GitHub
+```
+git clone https://github.com/GhostSlayer/Listenssh
+```
+
 ### Install dependencies
 ```
 pip install -r requirements.txt
