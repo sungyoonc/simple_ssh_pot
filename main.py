@@ -1,4 +1,4 @@
-import requests, socket, configparser, random, string
+import requests, socket, configparser, random, string, select
 
 from cachetools import TTLCache
 
@@ -19,22 +19,34 @@ discord_webhook_url = config['Discord']['WebhookURL']
 
 cache = TTLCache(maxsize=50, ttl=900)
 
-socketname = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-socketname.bind(("", 22))
-socketname.listen()
+servers = [] 
+
+for port in config['Ports']['Ports'].split(","):
+    ds = ("0.0.0.0", int(port))
+
+    server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    server.bind(ds)
+    server.listen(1)
+    
+    servers.append(server)
 
 
 print('[INFO] ListenSSH is running')
 
 while True:
-  connection, address = socketname.accept()  # address is the ip
+  ready_server = select.select(servers, [], [])[0][0]
+
+  connection, address = ready_server.accept()  # address is the ip
+  port = server.getsockname()[1]
+
   address = str(address).split("'")
   address = address[1]
 
   params = {
       'ip': str(address),
       'categories': config['AbuseIPDB']['Categories'],
-      'comment': f"Unauthorized connection attempt detected from IP address {str(address)} to port 22 ({config['Info']['Server']}) [{random.choice(string.ascii_letters)}]"
+      'comment': f"Unauthorized connection attempt detected from IP address {str(address)} to port {port} ({config['Info']['Server']})"
   }
 
   headers = {
@@ -62,6 +74,4 @@ while True:
   else:
     print('[INFO] Cache: ip exists in cache (TTL: 15mins)')
 
-
-    
   connection.close()
