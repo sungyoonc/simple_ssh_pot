@@ -38,7 +38,7 @@ while True:
   ready_server = select.select(servers, [], [])[0][0]
 
   connection, address = ready_server.accept()  # address is the ip
-  port = server.getsockname()[1]
+  port = ready_server.getsockname()[1]
 
   address = str(address).split("'")
   address = address[1]
