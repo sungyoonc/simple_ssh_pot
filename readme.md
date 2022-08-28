@@ -12,6 +12,7 @@ You have to repeat the ``-p 22:22`` thing for every port you are running in conf
 
 You might have to customize the docker-compose.yml file for your needs.
 
+## Installation (Manual)
 ### Get all files from GitHub
 ```
 git clone https://github.com/GhostSlayer/Listenssh
