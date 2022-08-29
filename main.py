@@ -1,6 +1,17 @@
-import requests, socket, configparser, random, string, select
+import configparser
+import logging
+import random
+import select
+import signal
+import socket
+import string
 
+import requests
 from cachetools import TTLCache
+
+from utils.discordwebhook import discord_webhook
+
+logging.basicConfig(format='%(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 
 config = configparser.ConfigParser()
 config.read('config.ini')
@@ -16,23 +27,28 @@ if not config['AbuseIPDB']['Key']:
 
 url = config['AbuseIPDB']['ReportURL']
 discord_webhook_url = config['Discord']['WebhookURL']
+servername = config['Info']['Server']
 
 cache = TTLCache(maxsize=50, ttl=900)
 
 servers = [] 
 
 for port in config['Ports']['Ports'].split(","):
-    ds = ("0.0.0.0", int(port))
+  ds = ("0.0.0.0", int(port))
 
-    server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+  server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+  server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+
+  try:
     server.bind(ds)
     server.listen(1)
     
     servers.append(server)
+  except:
+    logging.warn(f'Failed to bind port {int(port)}. Port is perhaps in use?')
 
 
-print('[INFO] ListenSSH is running')
+logging.info('ListenSSH is running')
 
 while True:
   ready_server = select.select(servers, [], [])[0][0]
@@ -43,10 +59,16 @@ while True:
   address = str(address).split("'")
   address = address[1]
 
+  logging.info(f'Unauthorized connection attempt detected from IP address {str(address)} to port {port}')
+
+  
+  if discord_webhook_url:
+    discord_webhook(str(address), int(port), discord_webhook_url, servername, )
+
   params = {
       'ip': str(address),
       'categories': config['AbuseIPDB']['Categories'],
-      'comment': f"Unauthorized connection attempt detected from IP address {str(address)} to port {port} ({config['Info']['Server']})"
+      'comment': f"Unauthorized connection attempt detected from IP address {str(address)} to port {port} ({servername})"
   }
 
   headers = {
@@ -54,24 +76,18 @@ while True:
       'Key': config['AbuseIPDB']['Key']
   }
 
-  message = {
-      "content": "Attempted SSH Login From IP Address: " + str(address) + " Automatically Reporting To AbuseIPDB.com."
-  }
-
-  if discord_webhook_url:
-    requests.post(discord_webhook_url, data=message)
 
   if cache.get(str(address), None) != True:
     response = requests.request(method='POST', url=url, params=params, headers=headers)
 
     if response.status_code == 429:
         cache[str(address)] = True
-        print("IP Already reported - You must wait 15 minutes")
+        logging.info(f'IP {str(address)} Already reported - You must wait 15 minutes')
     else:
         cache[str(address)] = True
-        print("User reported, IP: " + str(address))
+        logging.info("IP reported to AbuseIPDB: " + str(address))
         pass
   else:
-    print('[INFO] Cache: ip exists in cache (TTL: 15mins)')
+    logging.info('Cache: ip exists in cache (TTL: 15mins)')
 
   connection.close()
