@@ -18,9 +18,10 @@ def discord_webhook(address, port, webhook_url, servername, ip_data):
   message = {}
   fields = []
 
-  message = {
-      "content": f'Unauthorized connection attempt detected from IP address {str(address[0])} to port {port} ({servername})',
-  }
+  if message_type == 'message' or not message_type :
+    message = {
+        "content": f'Unauthorized connection attempt detected from IP address {str(address)} to port {port} ({servername})',
+    }
     
   fields.extend([
     {
