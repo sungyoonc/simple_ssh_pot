@@ -76,7 +76,7 @@ while True:
   params = {
       'ip': str(address[0]),
       'categories': config['AbuseIPDB']['Categories'],
-      'comment': f"Unauthorized connection attempt detected from IP address {str(address[0])} to port {port} ({servername})"
+      'comment': f"Unauthorized connection attempt detected from IP address {str(address[0])} to port {port} ({servername}) [{random.choice(string.ascii_letters)}]"
   }
 
   headers = {
