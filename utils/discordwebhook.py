@@ -11,8 +11,8 @@ config.read('config.ini')
 try:
   message_type = config['Discord']['Type']
 except:
-  logging.warn('Discord.Type is missing from config! Throwback value: "message". Please check example config.')
-  message_type = 'message'
+  logging.warn('Discord.Type is missing from config! Throwback value: "embed". Please check example config.')
+  message_type = 'embed'
 
 def discord_webhook(address, port, webhook_url, servername, ip_data):
   message = {}
