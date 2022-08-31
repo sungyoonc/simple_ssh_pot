@@ -1,6 +1,13 @@
 # Listenssh
 ORIGINAL CODE BY [pccs](https://pccs.uk), this is a modified one by me. I have pretty small python experience so hope everything is working fine
 
+
+## Features
+- AbuseIPDB reporter (with built-in ratelimits)
+- Discord Webhooks (text or embed)
+- IP-API integration on Discord embed webhooks
+
+
 ## Installation (Docker)
 
 ### Docker run method
