@@ -10,8 +10,9 @@ import requests
 from cachetools import TTLCache
 
 from utils.discordwebhook import discord_webhook
+from utils.ip_api import ip_api
 
-logging.basicConfig(format='%(name)s - %(levelname)s - %(message)s', level=logging.INFO)
+logging.basicConfig(format='%(asctime)s [%(levelname)s] %(message)s', level=logging.INFO)
 
 config = configparser.ConfigParser()
 config.read('config.ini')
@@ -28,6 +29,12 @@ if not config['AbuseIPDB']['Key']:
 url = config['AbuseIPDB']['ReportURL']
 discord_webhook_url = config['Discord']['WebhookURL']
 servername = config['Info']['Server']
+
+try:
+  ip_api_enabled = config['IP_API']['Enabled']
+except:
+  logging.warning('IP_API.Enabled is missing from config! Throwback value: "yes". Please check example config.')
+  ip_api_enabled = "yes"
 
 cache = TTLCache(maxsize=50, ttl=900)
 
@@ -56,19 +63,20 @@ while True:
   connection, address = ready_server.accept()  # address is the ip
   port = ready_server.getsockname()[1]
 
-  address = str(address).split("'")
-  address = address[1]
-
-  logging.info(f'Unauthorized connection attempt detected from IP address {str(address)} to port {port}')
-
+  if ip_api_enabled == "yes":
+    ip_data = ip_api(address[0])
+  else: 
+    ip_data = False
+ 
+  logging.info(f'[CONNECTION ATTEMPT] IP={str(address[0])} SRC_PORT={address[1]} DEST_PORT={port}')
   
   if discord_webhook_url:
-    discord_webhook(str(address), int(port), discord_webhook_url, servername, )
+    discord_webhook(address, int(port), discord_webhook_url, servername, ip_data)
 
   params = {
-      'ip': str(address),
+      'ip': str(address[0]),
       'categories': config['AbuseIPDB']['Categories'],
-      'comment': f"Unauthorized connection attempt detected from IP address {str(address)} to port {port} ({servername})"
+      'comment': f"Unauthorized connection attempt detected from IP address {str(address[0])} to port {port} ({servername})"
   }
 
   headers = {
@@ -77,17 +85,14 @@ while True:
   }
 
 
-  if cache.get(str(address), None) != True:
+  if cache.get(str(address[0]), None) != True:
     response = requests.request(method='POST', url=url, params=params, headers=headers)
 
     if response.status_code == 429:
-        cache[str(address)] = True
-        logging.info(f'IP {str(address)} Already reported - You must wait 15 minutes')
+        cache[str(address[0])] = True
+        
     else:
-        cache[str(address)] = True
-        logging.info("IP reported to AbuseIPDB: " + str(address))
+        cache[str(address[0])] = True
         pass
-  else:
-    logging.info('Cache: ip exists in cache (TTL: 15mins)')
 
   connection.close()

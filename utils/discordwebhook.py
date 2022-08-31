@@ -3,7 +3,7 @@ import logging
 
 import requests
 
-logging.basicConfig(format='%(name)s - %(levelname)s - %(message)s', level=logging.INFO)
+logging.basicConfig(format='%(asctime)s [%(levelname)s] %(message)s', level=logging.INFO)
 
 config = configparser.ConfigParser()
 config.read('config.ini')
@@ -14,30 +14,46 @@ except:
   logging.warn('Discord.Type is missing from config! Throwback value: "message". Please check example config.')
   message_type = 'message'
 
-def discord_webhook(address, port, webhook_url, servername):
+def discord_webhook(address, port, webhook_url, servername, ip_data):
   message = {}
+  fields = []
 
-  if message_type == 'message' or not message_type :
-    message = {
-        "content": f'Unauthorized connection attempt detected from IP address {str(address)} to port {port} ({servername})',
+  message = {
+      "content": f'Unauthorized connection attempt detected from IP address {str(address[0])} to port {port} ({servername})',
+  }
+    
+  fields.extend([
+    {
+      'name': 'IP Address',
+      'value': str(address[0])
+    },
+    {
+      'name': 'Attacked port',
+      'value': int(port)
     }
+  ])
+
+  if ip_data:
+    fields.extend([ 
+      {
+        'name': 'ISP',
+        'value': ip_data.get('isp'),
+        'inline': True
+      },
+      {
+        'name': 'Country',
+        'value': ip_data.get('country'),
+        'inline': True
+      }
+    ])
 
   if message_type == 'embed':
     message["embeds"] = [
       {
         "title" : "Unauthorized connection attempt",
         "color": "15158332",
-        "description" : f'Unauthorized connection attempt detected from IP address {str(address)} to port {port}',
-        "fields": [
-          {
-            'name': 'IP Address',
-            'value': str(address)
-          },
-          {
-            'name': 'Attacked port',
-            'value': int(port)
-          }
-        ],
+        "description" : f'Unauthorized connection attempt detected from IP address {str(address[0])} to port {port}',
+        "fields": fields,
         "footer": {
           'text': f'Server: {servername}'
         }
