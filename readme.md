@@ -28,7 +28,8 @@ Sadly, you have to repeat the ``-p 22:22`` thing for every port you are running 
 Tools to install (install command below):
 - [Python 3](https://www.python.org/downloads/)
 - [Git](https://git-scm.com/downloads)
-### Get all files from GitHub
+
+
 ```sh
 # Install required packages
 apt install -y python3 python3-pip git
@@ -53,7 +54,7 @@ python3 main.py
 ## Run in background
 
 ### Systemd
-If you wish to run ListenSSH using Systemd, which we highly require, follow these instructions
+If you wish to run ListenSSH using Systemd, which we highly recommend, follow these instructions
 
 ```sh
 cp systemd/listenssh.service /etc/systemd/system/listenssh.service
