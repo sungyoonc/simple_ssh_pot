@@ -1,6 +1,6 @@
 module.exports = {
   apps: [{
-    name: "SSHListener",
+    name: "ListenSSH",
     script: "./main.py",
     interpreter: 'python3'
   }]
