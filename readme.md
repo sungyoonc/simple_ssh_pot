@@ -12,12 +12,12 @@ For easier and faster port configuration we dont recommend using Docker.
 
 ### Docker run method
 
-```
+```sh
 docker run -v "$(pwd)"/config.ini:/listenssh/config.ini -p 22:22 -p 23:23 -p 139:139 -p 445:445 -p 3306:3306 -p 5432:5432 ghostslayer/listenssh
 ```
 
 #### Docker Compose
-```
+```sh
 docker-compose up -d
 ```
 
@@ -29,7 +29,7 @@ Tools to install (install command below):
 - [Python 3](https://www.python.org/downloads/)
 - [Git](https://git-scm.com/downloads)
 ### Get all files from GitHub
-```
+```sh
 # Install required packages
 apt install -y python3 python3-pip git
 
@@ -55,7 +55,7 @@ python3 main.py
 ### Systemd
 If you wish to run ListenSSH using Systemd, which we highly require, follow these instructions
 
-```
+```sh
 cp systemd/listenssh.service /etc/systemd/system/listenssh.service
 
 # Change the "WorkingDirectory" to the one where you have installed ListenSSH (unless its the root directory)
@@ -67,7 +67,7 @@ systemctl start listenssh.service
 ```
 
 ### PM2
-```
+```sh
 # Make it so PM2 restarts ListenSSH on server reboot
 pm2 startup
 
