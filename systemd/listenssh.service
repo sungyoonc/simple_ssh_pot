@@ -4,7 +4,7 @@ After=network.target
 
 [Service]
 WorkingDirectory=/root/Listenssh
-ExecStart=python3 main.py
+ExecStart=/usr/bin/python3 main.py
 Restart=always
 RestartSec=10
 
