@@ -65,10 +65,10 @@ while True:
 
   if ip_api_enabled == "yes":
     ip_data = ip_api(address[0])
+    logging.info(f'[CONNECTION ATTEMPT] IP={str(address[0])} SRC_PORT={address[1]} DEST_PORT={port} ISP="{ip_data.get("isp")}" COUNTRY={ip_data.get("country")}')
   else: 
     ip_data = False
- 
-  logging.info(f'[CONNECTION ATTEMPT] IP={str(address[0])} SRC_PORT={address[1]} DEST_PORT={port}')
+    logging.info(f'[CONNECTION ATTEMPT] IP={str(address[0])} SRC_PORT={address[1]} DEST_PORT={port}')
   
   if discord_webhook_url:
     discord_webhook(address, int(port), discord_webhook_url, servername, ip_data)
