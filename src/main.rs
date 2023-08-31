@@ -1,11 +1,31 @@
-use log::{error, info};
+#[macro_use]
+extern crate log;
+
+extern crate simplelog;
+
+use simplelog::*;
+use std::fs::File;
+
 use std::net::{SocketAddr, TcpListener, TcpStream};
 
 fn main() {
-    env_logger::init();
+    CombinedLogger::init(vec![
+        TermLogger::new(
+            LevelFilter::Info,
+            Config::default(),
+            TerminalMode::Mixed,
+            ColorChoice::Auto,
+        ),
+        WriteLogger::new(
+            LevelFilter::Info,
+            Config::default(),
+            File::create("listen_ssh.log").unwrap(),
+        ),
+    ])
+    .unwrap();
     let addr = SocketAddr::from(([127, 0, 0, 1], 7878));
     let listener = TcpListener::bind(&addr).unwrap();
-    info!("Listening on {}", addr);
+    debug!("Listening on {}", addr);
 
     for stream in listener.incoming() {
         let stream = stream.unwrap();
