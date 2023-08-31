@@ -4,5 +4,6 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+config = "0.13.3"
 log = "0.4.20"
 simplelog = "0.12.1"

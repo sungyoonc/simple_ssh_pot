@@ -3,29 +3,50 @@ extern crate log;
 
 extern crate simplelog;
 
-use simplelog::*;
+use simplelog::{CombinedLogger, TermLogger, WriteLogger};
 use std::fs::File;
 
+use std::collections::HashMap;
+
+use config::Config;
 use std::net::{SocketAddr, TcpListener, TcpStream};
 
 fn main() {
     CombinedLogger::init(vec![
         TermLogger::new(
-            LevelFilter::Info,
-            Config::default(),
-            TerminalMode::Mixed,
-            ColorChoice::Auto,
+            simplelog::LevelFilter::Info,
+            simplelog::Config::default(),
+            simplelog::TerminalMode::Mixed,
+            simplelog::ColorChoice::Auto,
         ),
         WriteLogger::new(
-            LevelFilter::Info,
-            Config::default(),
+            simplelog::LevelFilter::Info,
+            simplelog::Config::default(),
             File::create("listen_ssh.log").unwrap(),
         ),
     ])
     .unwrap();
-    let addr = SocketAddr::from(([127, 0, 0, 1], 7878));
+
+    let mut settings = Config::builder()
+        .add_source(config::File::with_name("config.toml"))
+        .build()
+        .expect("Failed to load config")
+        .try_deserialize::<HashMap<String, String>>()
+        .unwrap();
+
+    println!("{:?}", settings);
+    settings
+        .entry(String::from("port"))
+        .or_insert(String::from("7878"));
+
+    let port: u16 = settings
+        .get(&String::from("port"))
+        .unwrap()
+        .parse()
+        .expect("Failed to parse port");
+    let addr = SocketAddr::from(([127, 0, 0, 1], port));
     let listener = TcpListener::bind(&addr).unwrap();
-    debug!("Listening on {}", addr);
+    info!("Listening on {}", addr);
 
     for stream in listener.incoming() {
         let stream = stream.unwrap();
