@@ -9,7 +9,7 @@ use std::fs::File;
 use std::collections::HashMap;
 
 use config::Config;
-use std::net::{SocketAddr, TcpListener, TcpStream};
+use std::net::{Ipv4Addr, SocketAddr, TcpListener, TcpStream};
 
 fn main() {
     CombinedLogger::init(vec![
@@ -44,7 +44,13 @@ fn main() {
         .unwrap()
         .parse()
         .expect("Failed to parse port");
-    let addr = SocketAddr::from(([127, 0, 0, 1], port));
+    let bind_ip: Ipv4Addr = settings
+        .get(&String::from("bind"))
+        .unwrap()
+        .parse()
+        .expect("Failed to parse bind ip");
+
+    let addr = SocketAddr::from((bind_ip, port));
     let listener = TcpListener::bind(&addr).unwrap();
     info!("Listening on {}", addr);
 
