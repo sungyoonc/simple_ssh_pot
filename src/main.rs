@@ -34,7 +34,7 @@ fn main() {
         .try_deserialize::<HashMap<String, String>>()
         .unwrap();
 
-    println!("{:?}", settings);
+    debug!("Loaded config: {:?}", settings);
     settings
         .entry(String::from("port"))
         .or_insert(String::from("7878"));
