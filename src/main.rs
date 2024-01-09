@@ -27,17 +27,8 @@ fn main() {
     ])
     .unwrap();
 
-    let mut settings = Config::builder()
-        .add_source(config::File::with_name("config.toml"))
-        .build()
-        .expect("Failed to load config")
-        .try_deserialize::<HashMap<String, String>>()
-        .unwrap();
 
-    debug!("Loaded config: {:?}", settings);
-    settings
-        .entry(String::from("port"))
-        .or_insert(String::from("7878"));
+    let settings = load_config().expect("Failed to load config");
 
     let port: u16 = settings
         .get(&String::from("port"))
@@ -59,6 +50,15 @@ fn main() {
 
         handle_connection(stream);
     }
+}
+fn load_config() -> Result<HashMap<String, String>, config::ConfigError> {
+    let settings = Config::builder()
+        .set_default("port", "7878")?
+        .set_default("bind", "0.0.0.0")?
+        .add_source(config::File::with_name("config.toml"))
+        .build()?
+        .try_deserialize::<HashMap<String, String>>();
+    settings
 }
 
 fn handle_connection(stream: TcpStream) {
