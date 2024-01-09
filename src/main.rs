@@ -22,7 +22,7 @@ fn main() {
         WriteLogger::new(
             simplelog::LevelFilter::Info,
             simplelog::Config::default(),
-            File::create("listen_ssh.log").unwrap(),
+            File::create("simple_ssh_pot.log").unwrap(),
         ),
     ])
     .unwrap();

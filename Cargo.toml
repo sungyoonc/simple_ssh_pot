@@ -1,5 +1,5 @@
 [package]
-name = "listen_ssh"
+name = "simple_ssh_pot"
 version = "0.1.0"
 edition = "2021"
 
