@@ -1,0 +1,14 @@
+bind = "0.0.0.0"
+port = 8080
+
+[abuseipdb]
+enabled = false
+url = "https://api.abuseipdb.com/api/v2/report"
+key = ""
+categories = [18, 22]
+
+[abuseipdb.comment]
+# Leave blank to disable
+hostname = "" 
+display_port = ""
+message = ""
