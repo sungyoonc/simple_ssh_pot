@@ -7,6 +7,7 @@ use std::collections::HashMap;
 use std::fs::File;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr, TcpListener, TcpStream};
 
+use reqwest::header::HeaderMap;
 use simplelog::{CombinedLogger, TermLogger, WriteLogger};
 
 use config::Config;
@@ -163,6 +164,10 @@ async fn process_ip(ip: IpAddr, config: &Configuration) -> () {
     create = "{ TimedCache::with_lifespan_and_capacity(900, 50) }"
 )]
 async fn to_abuseipdb(ip: IpAddr, config: AbuseIPDBConfig) -> bool {
+    let mut headers = HeaderMap::new();
+    headers.insert("Key", config.key.parse().unwrap());
+    headers.insert(reqwest::header::ACCEPT, "application/json".parse().unwrap());
+
     let mut body: HashMap<&str, String> = HashMap::new();
     body.insert("ip", ip.to_string());
     body.insert("categories", config.categories.join(","));
@@ -180,7 +185,13 @@ async fn to_abuseipdb(ip: IpAddr, config: AbuseIPDBConfig) -> bool {
     body.insert("comment", comment);
 
     let clinet = reqwest::Client::new();
-    let res = match clinet.post(config.url).json(&body).send().await {
+    let res = match clinet
+        .post(config.url)
+        .headers(headers)
+        .json(&body)
+        .send()
+        .await
+    {
         Ok(res) => res,
         Err(err) => {
             error!("AbuseIPDB: Could not make request: {}", err);
