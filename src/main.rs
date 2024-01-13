@@ -5,10 +5,12 @@ extern crate simplelog;
 
 use std::collections::HashMap;
 use std::fs::File;
-use std::net::{IpAddr, Ipv4Addr, SocketAddr, TcpListener, TcpStream};
+use std::io;
+use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 
 use reqwest::header::HeaderMap;
 use simplelog::{CombinedLogger, TermLogger, WriteLogger};
+use tokio::net::{TcpListener, TcpStream};
 
 use config::Config;
 
@@ -31,6 +33,7 @@ struct AbuseIPDBCommentConfig {
     message: String,
 }
 
+#[derive(Clone)]
 struct Configuration {
     bind: Ipv4Addr,
     port: u16,
@@ -38,7 +41,7 @@ struct Configuration {
 }
 
 #[tokio::main]
-async fn main() {
+async fn main() -> io::Result<()> {
     CombinedLogger::init(vec![
         TermLogger::new(
             simplelog::LevelFilter::Info,
@@ -57,12 +60,11 @@ async fn main() {
     let config = load_config().expect("Failed to load config");
 
     let addr = SocketAddr::from((config.bind, config.port));
-    let listener = TcpListener::bind(&addr).unwrap();
+    let listener = TcpListener::bind(&addr).await?;
     info!("Listening on {}", addr);
 
-    for stream in listener.incoming() {
-        let stream = stream.unwrap();
-
+    loop {
+        let (stream, _) = listener.accept().await?;
         handle_connection(stream, &config).await;
     }
 }
@@ -149,11 +151,11 @@ async fn handle_connection(stream: TcpStream, config: &Configuration) {
         local_addr.port(),
     );
     if !no_report {
-        process_ip(remote_addr.ip(), config).await;
+        tokio::spawn(process_ip(remote_addr.ip(), config.clone()));
     }
 }
 
-async fn process_ip(ip: IpAddr, config: &Configuration) -> () {
+async fn process_ip(ip: IpAddr, config: Configuration) -> () {
     if config.abuseipdb.enabled {
         to_abuseipdb(ip, config.abuseipdb.clone()).await;
     }
