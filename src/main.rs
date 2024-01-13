@@ -7,8 +7,12 @@ use std::collections::HashMap;
 use std::fs::File;
 use std::io;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use reqwest::header::HeaderMap;
+use serenity::builder::ExecuteWebhook as DiscordExecuteWebhook;
+use serenity::http::Http as DiscordHttp;
+use serenity::model::webhook::Webhook as DiscordWebhook;
 use simplelog::{CombinedLogger, TermLogger, WriteLogger};
 use tokio::net::{TcpListener, TcpStream};
 
@@ -23,11 +27,19 @@ struct AbuseIPDBConfig {
     url: String,
     key: String,
     categories: Vec<String>,
-    comment: AbuseIPDBCommentConfig,
+    comment: CommentConfig,
 }
 
 #[derive(Hash, PartialEq, Eq, Clone)]
-struct AbuseIPDBCommentConfig {
+struct DiscordConfig {
+    enabled: bool,
+    url: String,
+    username: String,
+    comment: CommentConfig,
+}
+
+#[derive(Hash, PartialEq, Eq, Clone)]
+struct CommentConfig {
     hostname: String,
     display_port: String,
     message: String,
@@ -38,6 +50,7 @@ struct Configuration {
     bind: Ipv4Addr,
     port: u16,
     abuseipdb: AbuseIPDBConfig,
+    discord: DiscordConfig,
 }
 
 #[tokio::main]
@@ -79,7 +92,13 @@ fn load_config() -> Result<Configuration, config::ConfigError> {
         .set_default("abuseipdb.key", "")?
         .set_default("abuseipdb.comment.hostname", "")?
         .set_default("abuseipdb.comment.display_port", "")?
-        .set_default("abuseipdb.comment.message", "")?;
+        .set_default("abuseipdb.comment.message", "")?
+        .set_default("discord.enabled", false)?
+        .set_default("discord.url", "")?
+        .set_default("discord.username", "")?
+        .set_default("discord.comment.hostname", "")?
+        .set_default("discord.comment.display_port", "")?
+        .set_default("discord.comment.message", "")?;
 
     let loaded_config = config_builder
         .add_source(config::File::with_name("config.toml"))
@@ -111,10 +130,20 @@ fn load_config() -> Result<Configuration, config::ConfigError> {
             url: loaded_config.get_string("abuseipdb.url")?,
             key: loaded_config.get_string("abuseipdb.key")?,
             categories,
-            comment: AbuseIPDBCommentConfig {
+            comment: CommentConfig {
                 hostname: loaded_config.get_string("abuseipdb.comment.hostname")?,
                 display_port: loaded_config.get_string("abuseipdb.comment.display_port")?,
                 message: loaded_config.get_string("abuseipdb.comment.message")?,
+            },
+        },
+        discord: DiscordConfig {
+            enabled: loaded_config.get_bool("discord.enabled")?,
+            url: loaded_config.get_string("discord.url")?,
+            username: loaded_config.get_string("discord.username")?,
+            comment: CommentConfig {
+                hostname: loaded_config.get_string("discord.comment.hostname")?,
+                display_port: loaded_config.get_string("discord.comment.display_port")?,
+                message: loaded_config.get_string("discord.comment.message")?,
             },
         },
     };
@@ -158,6 +187,10 @@ async fn handle_connection(stream: TcpStream, config: &Configuration) {
 async fn process_ip(ip: IpAddr, config: Configuration) -> () {
     if config.abuseipdb.enabled {
         to_abuseipdb(ip, config.abuseipdb.clone()).await;
+    }
+    if config.discord.enabled {
+        let epoch_time = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
+        to_discord_webhook(ip, &config.discord, epoch_time.as_secs()).await;
     }
 }
 
@@ -212,7 +245,34 @@ async fn to_abuseipdb(ip: IpAddr, config: AbuseIPDBConfig) -> bool {
     return true;
 }
 
-// async fn to_discord_webhook(ip: IpAddr, config: DiscordConfig) -> bool {
-//     // 1. send discord weebhoo
-//     return true;
-// }
+async fn to_discord_webhook(ip: IpAddr, config: &DiscordConfig, epoch_time: u64) -> bool {
+    let mut comment = format!("Connection attemp from {}", ip.to_string());
+    if config.comment.display_port != "" {
+        comment += format!(" to port {}", config.comment.display_port).as_str();
+    }
+    comment += format!(" <t:{}:D><t:{}:T>", epoch_time, epoch_time).as_str();
+    if config.comment.hostname != "" {
+        comment += format!(" ({})", config.comment.hostname).as_str();
+    }
+    if config.comment.message != "" {
+        comment += format!(": {}", config.comment.message).as_str();
+    }
+
+    let http = DiscordHttp::new("");
+    let webhook = DiscordWebhook::from_url(&http, config.url.as_str())
+        .await
+        .unwrap();
+
+    let builder = DiscordExecuteWebhook::new()
+        .content(comment)
+        .username(&config.username);
+    let result = webhook.execute(&http, false, builder).await;
+    match result {
+        Ok(_) => {
+            return true;
+        }
+        Err(_) => {
+            return false;
+        }
+    }
+}

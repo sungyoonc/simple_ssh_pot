@@ -12,3 +12,14 @@ categories = [18, 22]
 hostname = "" 
 display_port = ""
 message = ""
+
+[discord]
+enabled = false
+url = ""
+username = "Simple SSH Pot"
+
+[discord.comment]
+# Leave blank to disable
+hostname = ""
+display_port = ""
+message = ""
