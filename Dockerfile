@@ -1,4 +1,4 @@
-FROM rust:1.71
+FROM rust:1.75
 
 WORKDIR /usr/src/simple_ssh_pot
 COPY . .
