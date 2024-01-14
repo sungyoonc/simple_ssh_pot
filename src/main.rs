@@ -5,7 +5,7 @@ extern crate simplelog;
 
 use std::cmp::Ordering;
 use std::collections::HashMap;
-use std::fs::File;
+use std::fs;
 use std::io;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::sync::{Arc, Mutex};
@@ -73,6 +73,7 @@ impl Default for DiscordRatelimit {
 
 #[tokio::main]
 async fn main() -> io::Result<()> {
+    fs::create_dir_all("data").expect("Failed to create data directory");
     CombinedLogger::init(vec![
         TermLogger::new(
             simplelog::LevelFilter::Info,
@@ -83,7 +84,7 @@ async fn main() -> io::Result<()> {
         WriteLogger::new(
             simplelog::LevelFilter::Info,
             simplelog::Config::default(),
-            File::create("simple_ssh_pot.log").unwrap(),
+            fs::File::create("data/simple_ssh_pot.log").unwrap(),
         ),
     ])
     .unwrap();

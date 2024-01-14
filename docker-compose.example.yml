@@ -1,0 +1,8 @@
+services:
+  simple_ssh_pot:
+    image: sungyoonc/simple-ssh-pot:latest
+    restart: unless-stopped
+    network_mode: host
+    volumes:
+      - "./config.toml:/app/config.toml"
+      - "./data/:/app/data/"
