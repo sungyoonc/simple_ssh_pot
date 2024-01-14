@@ -12,8 +12,9 @@ RUN RUSTFLAGS="-Ctarget-feature=-crt-static" cargo build --release
 # Stage - Deploy
 FROM alpine:3.19 as deploy_stage
 
-WORKDIR /usr/src/simple_ssh_pot
+WORKDIR /app
 RUN apk add libgcc
-COPY --from=build_stage /usr/src/simple_ssh_pot/target/release/simple_ssh_pot /usr/src/simple_ssh_pot
 
-CMD ["/usr/src/simple_ssh_pot/simple_ssh_pot"]
+COPY --from=build_stage /usr/src/simple_ssh_pot/target/release/simple_ssh_pot /app/simple_ssh_pot
+
+CMD ["/app/simple_ssh_pot"]
