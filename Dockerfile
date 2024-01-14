@@ -17,4 +17,4 @@ RUN apk add libgcc
 
 COPY --from=build_stage /usr/src/simple_ssh_pot/target/release/simple_ssh_pot /app/simple_ssh_pot
 
-CMD ["/app/simple_ssh_pot"]
+ENTRYPOINT ["/app/simple_ssh_pot"]
