@@ -3,16 +3,15 @@ extern crate log;
 
 extern crate simplelog;
 
+use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::fs::File;
 use std::io;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::sync::{Arc, Mutex};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use reqwest::header::HeaderMap;
-use serenity::builder::ExecuteWebhook as DiscordExecuteWebhook;
-use serenity::http::Http as DiscordHttp;
-use serenity::model::webhook::Webhook as DiscordWebhook;
 use simplelog::{CombinedLogger, TermLogger, WriteLogger};
 use tokio::net::{TcpListener, TcpStream};
 
@@ -53,6 +52,25 @@ struct Configuration {
     discord: DiscordConfig,
 }
 
+#[derive(Debug)]
+struct DiscordRatelimit {
+    limit: i64,
+    remaining: i64,
+    reset: Option<SystemTime>,
+    reset_after: Option<Duration>,
+}
+
+impl Default for DiscordRatelimit {
+    fn default() -> Self {
+        Self {
+            limit: i64::MAX,
+            remaining: i64::MAX,
+            reset: None,
+            reset_after: None,
+        }
+    }
+}
+
 #[tokio::main]
 async fn main() -> io::Result<()> {
     CombinedLogger::init(vec![
@@ -72,13 +90,15 @@ async fn main() -> io::Result<()> {
 
     let config = load_config().expect("Failed to load config");
 
+    let discord_ratelimit = Arc::new(Mutex::new(DiscordRatelimit::default()));
+
     let addr = SocketAddr::from((config.bind, config.port));
     let listener = TcpListener::bind(&addr).await?;
     info!("Listening on {}", addr);
 
     loop {
         let (stream, _) = listener.accept().await?;
-        handle_connection(stream, &config).await;
+        handle_connection(stream, &config, &discord_ratelimit).await;
     }
 }
 
@@ -150,7 +170,11 @@ fn load_config() -> Result<Configuration, config::ConfigError> {
     Ok(config)
 }
 
-async fn handle_connection(stream: TcpStream, config: &Configuration) {
+async fn handle_connection(
+    stream: TcpStream,
+    config: &Configuration,
+    discord_ratelimit: &Arc<Mutex<DiscordRatelimit>>,
+) {
     let remote_addr = match stream.peer_addr() {
         Ok(addr) => addr,
         Err(err) => {
@@ -180,17 +204,31 @@ async fn handle_connection(stream: TcpStream, config: &Configuration) {
         local_addr.port(),
     );
     if !no_report {
-        tokio::spawn(process_ip(remote_addr.ip(), config.clone()));
+        tokio::spawn(process_ip(
+            remote_addr.ip(),
+            config.clone(),
+            Arc::clone(discord_ratelimit),
+        ));
     }
 }
 
-async fn process_ip(ip: IpAddr, config: Configuration) -> () {
+async fn process_ip(
+    ip: IpAddr,
+    config: Configuration,
+    discord_ratelimit: Arc<Mutex<DiscordRatelimit>>,
+) -> () {
     if config.abuseipdb.enabled {
         to_abuseipdb(ip, config.abuseipdb.clone()).await;
     }
     if config.discord.enabled {
         let epoch_time = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
-        to_discord_webhook(ip, &config.discord, epoch_time.as_secs()).await;
+        to_discord_webhook(
+            ip,
+            &config.discord,
+            epoch_time.as_secs(),
+            &discord_ratelimit,
+        )
+        .await;
     }
 }
 
@@ -245,7 +283,15 @@ async fn to_abuseipdb(ip: IpAddr, config: AbuseIPDBConfig) -> bool {
     return true;
 }
 
-async fn to_discord_webhook(ip: IpAddr, config: &DiscordConfig, epoch_time: u64) -> bool {
+async fn to_discord_webhook(
+    ip: IpAddr,
+    config: &DiscordConfig,
+    epoch_time: u64,
+    discord_ratelimit: &Arc<Mutex<DiscordRatelimit>>,
+) -> bool {
+    let mut headers = HeaderMap::new();
+    headers.insert(reqwest::header::ACCEPT, "application/json".parse().unwrap());
+
     let mut comment = format!("Connection attemp from {}", ip.to_string());
     if config.comment.display_port != "" {
         comment += format!(" to port {}", config.comment.display_port).as_str();
@@ -258,21 +304,69 @@ async fn to_discord_webhook(ip: IpAddr, config: &DiscordConfig, epoch_time: u64)
         comment += format!(": {}", config.comment.message).as_str();
     }
 
-    let http = DiscordHttp::new("");
-    let webhook = DiscordWebhook::from_url(&http, config.url.as_str())
-        .await
-        .unwrap();
+    let mut body: HashMap<&str, String> = HashMap::new();
+    body.insert("username", config.username.clone());
+    body.insert("content", comment);
 
-    let builder = DiscordExecuteWebhook::new()
-        .content(comment)
-        .username(&config.username);
-    let result = webhook.execute(&http, false, builder).await;
-    match result {
-        Ok(_) => {
-            return true;
+    let clinet = reqwest::Client::new();
+    let mut ratelimited = true;
+    while ratelimited {
+        // Wait for ratelimit
+        let reset;
+        let reset_after;
+        let remaining;
+        {
+            let ratelimit = discord_ratelimit.lock().unwrap();
+            reset = ratelimit.reset.unwrap_or(UNIX_EPOCH);
+            reset_after = ratelimit.reset_after.unwrap_or(Duration::from_secs(0)); // unwrap_or makes sure that when reset_after is None, it doesn't sleep
+            remaining = ratelimit.remaining;
         }
-        Err(_) => {
+        if remaining == 0 && SystemTime::now().cmp(&reset) == Ordering::Less {
+            tokio::time::sleep(reset_after.clone()).await;
+        }
+
+        // Send webhook
+        let res = match clinet
+            .post(&config.url)
+            .headers(headers.clone())
+            .json(&body)
+            .send()
+            .await
+        {
+            Ok(res) => res,
+            Err(err) => {
+                error!("Discord Webhook: Could not make request: {}", err);
+                return false;
+            }
+        };
+        if res.status().as_u16() == 429 {
+            // Do nothing
+        } else if res.status().is_success() {
+            ratelimited = false;
+        } else {
+            println!("{}", res.status().is_success());
+            error!("Discord Webhook: IP={} failed to make request", ip);
             return false;
         }
+
+        // Save ratelimit information
+        {
+            let mut ratelimit = discord_ratelimit.lock().unwrap();
+            if let Some(limit) = res.headers().get("X-RateLimit-Limit") {
+                ratelimit.limit = limit.to_str().unwrap().parse().unwrap();
+            }
+            if let Some(remaining) = res.headers().get("X-RateLimit-Remaining") {
+                ratelimit.remaining = remaining.to_str().unwrap().parse().unwrap();
+            }
+            if let Some(reset) = res.headers().get("X-RateLimit-Reset") {
+                let time = Duration::from_secs(reset.to_str().unwrap().parse().unwrap());
+                ratelimit.reset = Some(UNIX_EPOCH + time);
+            }
+            if let Some(reset_after) = res.headers().get("X-RateLimit-Reset-After") {
+                let time = Duration::from_secs(reset_after.to_str().unwrap().parse().unwrap());
+                ratelimit.reset_after = Some(time);
+            }
+        }
     }
+    return true;
 }
