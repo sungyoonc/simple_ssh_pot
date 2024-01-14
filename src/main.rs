@@ -19,6 +19,8 @@ use config::Config;
 
 use cached::proc_macro::cached;
 use cached::TimedCache;
+use tokio::signal;
+use tokio_util::sync::CancellationToken;
 
 #[derive(Hash, PartialEq, Eq, Clone)]
 struct AbuseIPDBConfig {
@@ -92,15 +94,35 @@ async fn main() -> io::Result<()> {
     let config = load_config().expect("Failed to load config");
 
     let discord_ratelimit = Arc::new(Mutex::new(DiscordRatelimit::default()));
+    let cancel_token = CancellationToken::new();
+    let cloned_token = cancel_token.clone();
 
     let addr = SocketAddr::from((config.bind, config.port));
-    let listener = TcpListener::bind(&addr).await?;
-    info!("Listening on {}", addr);
+    let task_handle = tokio::spawn(async move {
+        let listener = TcpListener::bind(&addr).await.unwrap();
+        info!("Listening on {}", addr);
 
-    loop {
-        let (stream, _) = listener.accept().await?;
-        handle_connection(stream, &config, &discord_ratelimit).await;
+        loop {
+            tokio::select! {
+                Ok((stream, _)) = listener.accept() => {
+                    handle_connection(stream, &config, &discord_ratelimit).await;
+                },
+                _ = cloned_token.cancelled() => break,
+                else => break,
+            }
+        }
+    });
+
+    let mut sigterm = signal::unix::signal(signal::unix::SignalKind::terminate()).unwrap();
+    tokio::select! {
+        _ = sigterm.recv() => {},
+        _ = signal::ctrl_c() => {},
     }
+
+    info!("Shutting Down");
+    cancel_token.cancel();
+    task_handle.await.unwrap();
+    return Ok(());
 }
 
 fn load_config() -> Result<Configuration, config::ConfigError> {
